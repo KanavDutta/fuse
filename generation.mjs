@@ -71,7 +71,7 @@ export function createGenerationService({directory,apiKey='',fetchImpl=fetch,tim
       void run(job,validated);
       return {...job};
     },
-    async get(id){await ready;return validId(id)?jobs.get(id):null;},
+    async get(id){await ready;if(!validId(id))return null;await writes.get(id);const job=jobs.get(id);return job?{...job}:null;},
     async cancel(id){
       await ready;const job=validId(id)?jobs.get(id):null;
       if(!job)return null;

@@ -15,6 +15,8 @@
 
 Browser verification on the real app confirmed missing-key setup, configured status, example loading, and review-dialog content without submitting a paid request. It also exposed a pre-existing form reset collision (`id="reset"` masks the native form method); resetting now calls the form prototype method explicitly.
 
+The configured review dialog is shown in [generation-review.jpg](artifacts/generation-review.jpg). No generation was submitted while capturing it.
+
 ## Live status and limitations
 
 The local key is configured. A non-generating account check returned `missing_permissions`. This is not proof of invalid authentication and does not establish Music entitlement. No real Music generation, provider-produced audio, or billing outcome has been verified. Account plan and Music permission must be checked by the owner, followed by an intentional first generation from the review dialog.
