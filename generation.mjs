@@ -9,6 +9,20 @@ export function validateGeneration(input){
   return {prompt:input.prompt.trim(),duration:input.duration,instrumental:input.instrumental};
 }
 const validId=id=>/^[0-9a-f-]{36}$/.test(id);
+export async function providerFailure(response){
+  const messages={401:'ElevenLabs rejected the API key or its Music permissions. Check the key and Music API access, then restart.',402:'ElevenLabs requires payment or eligible Music API credits. Check your paid plan, Music API access, and available credits before retrying.',403:'Your ElevenLabs account or key cannot access Music. Check your plan and permissions.',429:'ElevenLabs rate limit or credits limit reached. Check your account before retrying.',422:'ElevenLabs rejected the prompt or duration. Review the request before retrying.'};
+  // Retain only recognized machine codes, never provider text or credential echoes.
+  let code;
+  try{
+    const chunks=[];let size=0;
+    for await(const chunk of response.body){size+=chunk.length;if(size>8192)break;chunks.push(chunk);}
+    if(size<=8192){const detail=JSON.parse(Buffer.concat(chunks).toString()).detail;
+      if(['missing_permissions','invalid_api_key','quota_exceeded','subscription_required','model_not_found'].includes(detail?.status))code=detail.status;
+    }
+  }catch{}
+  const specific={missing_permissions:'ElevenLabs denied a required key permission. In API key settings, check Music Generation access. Then retry deliberately.',invalid_api_key:'ElevenLabs reports an invalid API key. Replace the local .env key and restart before retrying.',quota_exceeded:'ElevenLabs reports insufficient credits or quota. Check account limits before retrying.',subscription_required:'ElevenLabs requires an eligible Music API subscription. Check your account plan before retrying.'};
+  return Object.assign(Error(specific[code]||messages[response.status]||'ElevenLabs could not complete this request. Check provider status before retrying.'),{providerStatus:response.status,providerCode:code});
+}
 export function createGenerationService({directory,apiKey='',fetchImpl=fetch,timeoutMs=300000}){
   const jobs=new Map(),controllers=new Map(),writes=new Map();let pending=false;
   async function save(job){
@@ -37,10 +51,7 @@ export function createGenerationService({directory,apiKey='',fetchImpl=fetch,tim
         method:'POST',headers:{'Content-Type':'application/json','xi-api-key':apiKey},signal:controller.signal,
         body:JSON.stringify({prompt:input.prompt,music_length_ms:input.duration*1000,force_instrumental:input.instrumental,model_id:'music_v2_5'}),
       });
-      if(!response.ok){
-        const messages={401:'ElevenLabs rejected the API key or its Music permissions. Check the key and Music API access, then restart.',403:'Your ElevenLabs account or key cannot access Music. Check your plan and permissions.',429:'ElevenLabs rate limit or credits limit reached. Check your account before retrying.',422:'ElevenLabs rejected the prompt or duration. Review the request before retrying.'};
-        throw Error(messages[response.status]||'ElevenLabs could not complete this request. Check provider status before retrying.');
-      }
+      if(!response.ok)throw await providerFailure(response);
       const type=response.headers.get('content-type')||'';
       if(!type.startsWith('audio/')&&!type.startsWith('application/octet-stream'))throw Error('ElevenLabs returned an unexpected audio format.');
       const chunks=[];let size=0;
@@ -53,6 +64,8 @@ export function createGenerationService({directory,apiKey='',fetchImpl=fetch,tim
     }catch(error){
       if(job.status!=='cancelled'){
         job.status='failed';
+        if(error.providerStatus)job.providerStatus=error.providerStatus;
+        if(error.providerCode)job.providerCode=error.providerCode;
         job.error=error.message?.startsWith('ElevenLabs')||error.message?.startsWith('Generated audio')?error.message:controller.signal.aborted?'Generation timed out. The provider may still charge; check your account before retrying.':'Generation failed due to a network or local storage error. Check your account before retrying.';
         try{await save(job);}catch{}
       }

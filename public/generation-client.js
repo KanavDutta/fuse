@@ -24,8 +24,12 @@ export function setupGeneration({collect,form}){
     if(job.status==='completed'){
       message('Generation complete. Your audio is saved on this computer.');
       $('#generatedPanel').hidden=false;$('#generatedAudio').src=job.audioUrl;$('#generatedDownload').href=job.audioUrl+'?download=1';
-    }else if(['failed','cancelled'].includes(job.status)){message(job.error||'Generation stopped.');remember(null);}
-    else{message('ElevenLabs is composing your track. No percentage estimate is available.');remember(job.id);}
+    }else if(['failed','cancelled'].includes(job.status)){
+      message(job.error||'Generation stopped.');
+      if([401,403].includes(job.providerStatus))$('#providerStatus').textContent='ElevenLabs key or access needs attention';
+      remember(null);
+    }
+    else{message('Waiting for ElevenLabs to return audio. No percentage estimate is available.');remember(job.id);}
   }
   async function poll(){
     clearTimeout(timer);

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {request as httpRequest} from 'node:http';
 import {createApp} from '../server.mjs';
-import {createGenerationService,validateGeneration} from '../generation.mjs';
+import {createGenerationService,validateGeneration,providerFailure} from '../generation.mjs';
 import {generationPrompt} from '../public/generation-client.js';
 
 async function fixture(t,fetchImpl,apiKey='test-key-not-a-real-credential'){
@@ -67,6 +67,21 @@ test('provider rejection has actionable error without exposing provider body or 
   const {base}=await fixture(t,async()=>new Response('SENSITIVE PROVIDER BODY',{status:401}));
   const job=await (await start(base)).json(),failed=await waitFor(base,job.id,'failed');
   assert.match(failed.error,/API key/);assert.ok(!JSON.stringify(failed).includes('SENSITIVE'));
+});
+
+test('provider permission codes give specific guidance without reflecting sensitive text',async()=>{
+  const failure=await providerFailure(new Response(JSON.stringify({detail:{status:'missing_permissions',message:'SENSITIVE ECHO'}}),{status:401}));
+  assert.equal(failure.providerStatus,401);assert.equal(failure.providerCode,'missing_permissions');
+  assert.match(failure.message,/Music Generation access/);assert.ok(!failure.message.includes('SENSITIVE'));
+  const unknown=await providerFailure(new Response(JSON.stringify({detail:{status:'SENSITIVE UNKNOWN',message:'SECRET'}}),{status:401}));
+  assert.equal(unknown.providerCode,undefined);assert.ok(!unknown.message.includes('SENSITIVE'));assert.ok(!unknown.message.includes('SECRET'));
+});
+
+test('payment-required rejection explains plan and credits without echoing billing details',async()=>{
+  const failure=await providerFailure(new Response('PRIVATE BILLING DETAILS',{status:402}));
+  assert.equal(failure.providerStatus,402);
+  assert.match(failure.message,/paid plan/);assert.match(failure.message,/credits/);
+  assert.ok(!failure.message.includes('PRIVATE'));
 });
 
 test('configured server validates input and refuses cross-origin requests before provider use',async t=>{
