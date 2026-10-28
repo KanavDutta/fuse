@@ -1,10 +1,10 @@
 # FUSE — Song Fusion Studio
 
-Local first version of a song-fusion audio app. Audio-provider connection is intentionally deferred.
+Local song-fusion studio with two-track DSP mixing, manual songwriting, and optional server-side ElevenLabs Music generation.
 
 ## Run
 
-Requires Node.js 20 or newer. No dependency installation is needed.
+Requires Node.js 20.12 or newer. No dependency installation is needed.
 
 ```sh
 npm start
@@ -29,15 +29,17 @@ Open http://127.0.0.1:3000. Set `PORT` to use another port. The server defaults 
 
 Imported audio is never uploaded. Recipes are stored in this browser's localStorage, not an account. Clearing browser data removes recipes and the working draft. Clear or New fusion starts a fresh working draft. Audio files are session-only. The optional Google Fonts stylesheet falls back to system fonts when offline.
 
-## Connect generation later
+## ElevenLabs Music generation
 
-See [ElevenLabs account and key setup](docs/ELEVENLABS-SETUP.md). The owner has requested this integration next; it is not active yet.
+Follow [the setup guide](docs/ELEVENLABS-SETUP.md). Copy .env.example to .env, add ELEVENLABS_API_KEY privately, and restart. The server loads this ignored file using Node's built-in environment-file loader. Without a key, generation returns HTTP 503. A configured key is not proof that your account has Music access.
 
-`GET /api/status` reports `connected: false`. `POST /api/generate` returns HTTP 503 with an explicit setup message. There is no simulated generation or generated demo track.
+Open Song workspace, fill the recipe or try the example, then choose Review generation. Edit the prompt (maximum 4,100 characters), select duration, and explicitly submit with your ElevenLabs credits. The adapter sends POST /v1/music with music_v2_5 and automatic MP3 output. Reference title/artist fields are excluded from the automatically built prompt; broad qualities and original song notes are included. The review prompt is separate from the longer exported brief.
 
-A future server adapter can use ElevenLabs Music's documented `POST /v1/music` endpoint. Keep its credential server-side in an ignored `.env` file; the current app does not load or use credentials. Before enabling generation, implement validated requests, persistent job status, cancellation/error handling, audio storage, and playback of returned files. The documented API accepts a prompt and music duration and returns audio: https://elevenlabs.io/docs/api-reference/music/compose
+Jobs and generated MP3s are stored locally in ignored data/generated/. The browser remembers the latest job across reloads. Pending jobs interrupted by a server restart are marked failed; they are not silently retried. Cancellation aborts local work but cannot guarantee cancellation of provider processing or charges. Generated audio has a distinct player and download action, including HTTP range support for seeking.
 
-Reference titles are user notes. The app does not fetch or analyze reference audio. The exported brief preserves the requested ten-section arrangement, but no provider result or production quality has been verified.
+Generation and generated-file routes are localhost-only with origin/host checks. LAN phone testing continues to support local audio mixing. Do not expose this personal server as a public generation service; hosted sharing needs account authentication, quotas, and deployment-specific storage.
+
+No paid generation has been verified in this development session. Unit/integration tests use explicitly injected test responses, not a simulated production provider. See [generation verification](test/GENERATION-VERIFICATION.md).
 
 ## Checks
 

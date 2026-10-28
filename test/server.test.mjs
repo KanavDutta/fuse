@@ -5,7 +5,7 @@ import {once} from 'node:events';
 
 test('app assets load and audio generation stays disconnected', {timeout:10000}, async () => {
   const child = spawn(process.execPath, ['server.mjs'], {
-    cwd: new URL('../', import.meta.url), env:{...process.env, HOST:'127.0.0.1', PORT:'3197'}, stdio:['ignore','pipe','pipe'],
+    cwd: new URL('../', import.meta.url), env:{...process.env, HOST:'127.0.0.1', PORT:'3197', ELEVENLABS_API_KEY:''}, stdio:['ignore','pipe','pipe'],
   });
   try {
     await Promise.race([
@@ -18,7 +18,7 @@ test('app assets load and audio generation stays disconnected', {timeout:10000},
       assert.equal(response.status,200,asset);
       if(asset==='/') assert.ok((await response.text()).includes('id="songSections"'));
     }
-    assert.deepEqual(await (await fetch(base+'/api/status')).json(), {connected:false,provider:null});
+    const status=await (await fetch(base+'/api/status')).json();assert.equal(status.connected,false);assert.equal(status.provider,null);
     const generation=await fetch(base+'/api/generate', {method:'POST'});
     assert.equal(generation.status,503);
     assert.match((await generation.json()).error,/not connected/);

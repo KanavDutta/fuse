@@ -48,3 +48,7 @@ Do not assume reference audio ingestion, streaming-service access, voice cloning
 ## Imported-audio mixing
 
 The app additionally supports local DSP mixing of two imported songs or prepared stems. It estimates BPM, accepts manual cue alignment, optionally matches speed with a pitch change, applies bass EQ and RMS gain balancing, and renders equal-power blends or DJ transitions to a downloadable stereo WAV. Peak attenuation prevents PCM clipping. Audio generation remains disconnected. Source files/results are session-only and independent of saved songwriting recipes. Model-based stem separation, key matching, automatic downbeat grids, pitch-preserving time stretching, and LUFS measurement remain future work.
+
+## Optional ElevenLabs integration
+
+The server now supports explicit, reviewed ElevenLabs Music requests when ELEVENLABS_API_KEY is configured in a private .env file. It validates prompts and durations, stores job status and audio locally, supports cancellation and generated MP3 playback/download, and refuses remote generation access. The default without a key remains disconnected. Music account access and a real paid generation have not yet been verified; test responses are injected only in automated tests.

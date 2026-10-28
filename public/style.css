@@ -23,3 +23,5 @@
   #mixer .muted{font-size:13px}
   #mixer .fine{font-size:11px}
 }
+
+#generationDialog{width:min(740px,92vw)}#generatedDownload{display:inline-block;color:var(--lime);text-decoration:none;max-width:100%}#generationStatus{overflow-wrap:anywhere}#generationDialog .check input{width:20px;height:20px} @media(max-width:720px){#generationDialog input,#generationDialog select,#generationDialog textarea{font-size:16px}#generationDialog button{min-height:48px}#generationDialog .fields{grid-template-columns:1fr}#generationDialog .check{min-height:48px}}

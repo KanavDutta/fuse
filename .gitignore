@@ -7,3 +7,4 @@ server-error.log
 test/fixtures/*.wav
 test/fixtures/*.mp3
 test/tools/
+data/

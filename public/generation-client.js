@@ -1,0 +1,74 @@
+export function generationPrompt(data){
+  const lines=['Compose an original song. Use original melodies and lyrics. Do not imitate a particular singer.',
+    `Genre: ${data.genre||''}`,`Mood: ${data.mood||''}`,`Tempo: ${data.bpm||110} BPM`,
+    `Vocals: ${data.vocals||''}`,`Rhythm: ${data.drums||''}`,`Instruments: ${data.instruments||''}`,
+    `Creative direction: ${data.direction||''}`,`Key and meter: ${data.songKey||'choose a suitable key'}, ${data.meter||'4/4'}`,
+    `Vocal direction: ${data.vocalNotes||''}`,`Mix notes: ${data.mixNotes||''}`,`Style tags: ${data.styleTags||''}`,
+    'Musical qualities to combine (context notes, no audio analysis):',...(data.references||[]).map(r=>r.qualities||''),
+    'Structure: Intro, Verse 1, Pre-Chorus, Chorus, Verse 2, Chorus, Bridge, Guitar/Synth Solo, Final Chorus, Outro. Adapt section lengths to the requested duration.'];
+  for(let i=0;i<10;i++)for(const key of ['Lyrics','Chords','Notes'])if(data[`section${i}${key}`])lines.push(`Section ${i+1} ${key}: ${data[`section${i}${key}`]}`);
+  return lines.join('\n');
+}
+
+export function setupGeneration({collect,form}){
+  const $=s=>document.querySelector(s),storeKey='fuse-generation-job';
+  let active=null,timer,configured=false;
+  const message=text=>{$('#generationStatus').textContent=text;};
+  const remember=id=>{try{if(id)localStorage.setItem(storeKey,id);else localStorage.removeItem(storeKey);}catch{}};
+  async function request(url,options){
+    const response=await fetch(url,options);const data=await response.json();if(!response.ok)throw Error(data.error||'The server could not complete this request.');return data;
+  }
+  function show(job){
+    active=job;remember(job.id);$('#cancelGeneration').hidden=!['queued','running'].includes(job.status);
+    $('#startGeneration').disabled=!configured||['queued','running'].includes(job.status);
+    if(job.status==='completed'){
+      message('Generation complete. Your audio is saved on this computer.');
+      $('#generatedPanel').hidden=false;$('#generatedAudio').src=job.audioUrl;$('#generatedDownload').href=job.audioUrl+'?download=1';
+    }else if(['failed','cancelled'].includes(job.status)){message(job.error||'Generation stopped.');remember(null);}
+    else{message('ElevenLabs is composing your track. No percentage estimate is available.');remember(job.id);}
+  }
+  async function poll(){
+    clearTimeout(timer);
+    if(!active||!['queued','running'].includes(active.status))return;
+    try{show(await request('/api/jobs/'+active.id));}catch(error){message('Could not refresh job status: '+error.message+' Open this dialog again to retry.');return;}
+    if(['queued','running'].includes(active.status))timer=setTimeout(poll,2000);
+  }
+  async function status(){
+    try{
+      const state=await request('/api/status');configured=state.connected;
+      $('#providerStatus').textContent=configured?'ElevenLabs configured · not yet verified':'Audio generation needs setup';
+      $('#providerHeading').textContent=configured?'ElevenLabs Music configured':'Set up ElevenLabs Music';
+      $('#providerDescription').textContent=configured?'Review a prompt to start a paid generation request.':'Add your API key to the local .env file and restart. Generation is localhost-only.';
+      $('#generationSetup').hidden=configured;
+    }catch{configured=false;$('#providerStatus').textContent='Provider status unavailable';}
+    $('#startGeneration').disabled=!configured||['queued','running'].includes(active?.status);
+  }
+  $('#generate').onclick=async()=>{
+    if(!form.reportValidity())return;
+    if(!active||!['queued','running'].includes(active.status)){
+      const data=collect();$('#generationPrompt').value=generationPrompt(data);$('#generationInstrumental').checked=data.vocals==='Instrumental only';
+    }
+    $('#generationDialog').showModal();await status();
+    if(active&&['queued','running'].includes(active.status))await poll();
+    countPrompt();
+  };
+  $('#closeGeneration').onclick=()=>$('#generationDialog').close();
+  function countPrompt(){
+    const length=$('#generationPrompt').value.length;
+    $('#promptCount').textContent=length+' / 4,100 characters';
+    $('#generationPrompt').setCustomValidity(length>4100?'Shorten the prompt to 4,100 characters before generating.':'');
+  }
+  $('#generationPrompt').oninput=countPrompt;
+  $('#generationForm').onsubmit=async event=>{
+    event.preventDefault();if(!configured)return;
+    $('#startGeneration').disabled=true;message('Submitting one generation request…');
+    try{
+      const job=await request('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:$('#generationPrompt').value,duration:Number($('#generationDuration').value),instrumental:$('#generationInstrumental').checked})});
+      show(job);await poll();
+    }catch(error){message(error.message+' If the connection failed after submission, check your provider account before retrying.');$('#startGeneration').disabled=false;}
+  };
+  $('#cancelGeneration').onclick=async()=>{if(!active)return;try{show(await request('/api/jobs/'+active.id,{method:'DELETE'}));}catch(error){message(error.message);}};
+  $('#generatedAudio').addEventListener('error',()=>message('Generated audio could not be played. Try the download or check the server is running.'));
+  void status();
+  try{const id=localStorage.getItem(storeKey);if(id&&/^[0-9a-f-]{36}$/.test(id)){active={id,status:'running'};void poll();}}catch{}
+}
