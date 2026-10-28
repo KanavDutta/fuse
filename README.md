@@ -1,0 +1,60 @@
+# FUSE — Song Fusion Studio
+
+Local first version of a song-fusion audio app. Audio-provider connection is intentionally deferred.
+
+## Run
+
+Requires Node.js 20 or newer. No dependency installation is needed.
+
+```sh
+npm start
+```
+
+Open http://127.0.0.1:3000. Set `PORT` to use another port. The server defaults to local-only access. For opt-in same-Wi-Fi phone testing, set `HOST=0.0.0.0` and use this computer's Wi-Fi IPv4 address from the phone. See [the physical-device checklist](test/PHYSICAL-DEVICE-CHECKLIST.md); physical-device results are still pending access to a phone.
+
+## Available now
+
+- Local two-track audio mixing: editable BPM estimates, source cues, optional speed matching (changes pitch), bass EQ/swapping, RMS level balancing, equal-power layered blends or timed DJ transitions, playback, and stereo WAV export.
+- Two or three track references with explicit musical qualities.
+- Genre, mood, tempo, duration, vocals, instruments, rhythm, and creative direction.
+- Live recipe summary; browser-local recipe saving, reopening, updating, and deletion.
+- Update an opened recipe or use Save as copy for an alternate version. Draft recovery remembers which recipe you were editing.
+- Editable generation briefs, copying, and text export. Rebuild from the current recipe to replace manual edits.
+- Automatic browser-local working draft recovery, including unfinished fields and brief edits.
+- Manual songwriting workspace with all ten sections, lyrics, chord progressions, arrangement/transition notes, key, meter, vocal direction, mix notes, and style tags.
+- Copy or download complete song notes even before reference fields are complete. Notes are also included when building a generation brief.
+- Existing recipes reopen with an empty song workspace when no song notes were saved.
+- Local audio import, playback, seeking, volume, and download.
+- Responsive layout and keyboard-accessible controls.
+
+Imported audio is never uploaded. Recipes are stored in this browser's localStorage, not an account. Clearing browser data removes recipes and the working draft. Clear or New fusion starts a fresh working draft. Audio files are session-only. The optional Google Fonts stylesheet falls back to system fonts when offline.
+
+## Connect generation later
+
+See [ElevenLabs account and key setup](docs/ELEVENLABS-SETUP.md). The owner has requested this integration next; it is not active yet.
+
+`GET /api/status` reports `connected: false`. `POST /api/generate` returns HTTP 503 with an explicit setup message. There is no simulated generation or generated demo track.
+
+A future server adapter can use ElevenLabs Music's documented `POST /v1/music` endpoint. Keep its credential server-side in an ignored `.env` file; the current app does not load or use credentials. Before enabling generation, implement validated requests, persistent job status, cancellation/error handling, audio storage, and playback of returned files. The documented API accepts a prompt and music duration and returns audio: https://elevenlabs.io/docs/api-reference/music/compose
+
+Reference titles are user notes. The app does not fetch or analyze reference audio. The exported brief preserves the requested ten-section arrangement, but no provider result or production quality has been verified.
+
+## Checks
+
+Run `npm test` for song-export and server checks. Browser checks should cover draft recovery after refresh, saved recipe reopening, manual brief preservation and rebuilding, text download/copy, imported-audio playback, and desktop/mobile layouts.
+
+## Mix two imported songs
+
+Open **Mix two songs**, import A and B (up to 50 MB and 10 minutes each), choose a layered blend or DJ transition, and set source cues. A starts at timeline zero; B starts at zero in a blend or at the transition start. Cues trim the start of each source. Correct the estimated BPM if needed. Optional speed matching changes pitch; it is not pitch-preserving time-stretching. Render up to 180 seconds, listen, and download the WAV. Output stops when the available mix audio ends. Changing any setting requires rendering again.
+
+Files and mix results stay in memory and are lost on refresh; they are not saved with recipes. The mixer does not upload files or call an audio-generation provider. Import prepared stems for vocal/instrumental layering. Stem separation, key detection/pitch matching, automatic downbeats, pitch-preserving stretching, and LUFS normalization are not implemented. Tempo estimates can be ambiguous; align source cues by ear.
+
+## Mixer quality and verification
+
+Level balancing uses silence-gated contiguous RMS blocks from the selected audio region. A 25 Hz high-pass removes sub-bass rumble; complementary bass envelopes reduce the middle-of-transition dip. Optional output recovery adds at most 6 dB while keeping sample peaks at or below -1 dBFS. This is not LUFS normalization or true-peak limiting.
+
+See [the browser verification report](test/MIXER-VERIFICATION.md) for tested scenarios, measured before/after levels, reproduction steps, and remaining checks. Generate local fixtures with `node scripts/mixer-fixtures.mjs`; inspect downloaded PCM16 WAVs with `node scripts/inspect-wav.mjs "path/to/mix.wav"`.
+
+MP3 CBR stereo (44.1 kHz) and VBR mono (48 kHz) were tested through browser import, mixing, playback, and WAV download, including malformed-file rejection and recovery. See [MP3 verification](test/MP3-VERIFICATION.md) for scope and reproduction. Import decoding stays in the browser; no encoder or decoder dependency was added to the app.
+
+Phone mixer layouts were checked at 320–600 px, plus tablet and landscape widths. Narrow settings stack into one column; phone inputs use 16 px text and larger touch areas. See [mobile viewport verification](test/MOBILE-VERIFICATION.md) for measurements, browser workflow checks, screenshots, and physical-device limitations.

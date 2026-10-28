@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+!.env.example
+server-output.log
+server-error.log
+test/fixtures/*.wav
+test/fixtures/*.mp3
+test/tools/
