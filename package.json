@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test"
+    "test": "node scripts/run-tests.mjs",
+    "local:engine": "node scripts/start-local-ace.mjs",
+    "local:benchmark": "node scripts/benchmark-local-ace.mjs"
   },
   "engines": {
     "node": ">=20.12.0"

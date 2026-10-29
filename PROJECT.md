@@ -52,3 +52,7 @@ The app additionally supports local DSP mixing of two imported songs or prepared
 ## Optional ElevenLabs integration
 
 The server now supports explicit, reviewed ElevenLabs Music requests when ELEVENLABS_API_KEY is configured in a private .env file. It validates prompts and durations, stores job status and audio locally, supports cancellation and generated MP3 playback/download, and refuses remote generation access. The default without a key remains disconnected. Music account access and a real paid generation have not yet been verified; test responses are injected only in automated tests.
+
+## Local generation implementation
+
+ACE-Step 1.5 turbo is installed privately under ignored data/local-ai. Low-memory GPU generation is connected through the loopback API, with optional LM disabled, CPU offloading, tiled decoding, eight inference steps, and single-task execution. Local mode supports instrumentals up to 30 seconds; it never falls back to ElevenLabs. See docs/LOCAL-GENERATION.md for startup and measured validation.

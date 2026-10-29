@@ -5,7 +5,7 @@ import {once} from 'node:events';
 
 test('app assets load and audio generation stays disconnected', {timeout:10000}, async () => {
   const child = spawn(process.execPath, ['server.mjs'], {
-    cwd: new URL('../', import.meta.url), env:{...process.env, HOST:'127.0.0.1', PORT:'3197', ELEVENLABS_API_KEY:''}, stdio:['ignore','pipe','pipe'],
+    cwd: new URL('../', import.meta.url), env:{...process.env, HOST:'127.0.0.1', PORT:'3197', ELEVENLABS_API_KEY:'', FUSE_GENERATION_PROVIDER:'elevenlabs'}, stdio:['ignore','pipe','pipe'],
   });
   try {
     await Promise.race([

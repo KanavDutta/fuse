@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {createGenerationService} from './generation.mjs';
+import {aceBase,aceReady} from './local-ace.mjs';
 const root=fileURLToPath(new URL('./public/',import.meta.url));
 const types={'.html':'text/html; charset=utf-8','.css':'text/css','.js':'text/javascript'};
 function localRequest(req){
@@ -15,18 +16,22 @@ async function body(req){
   for await(const chunk of req){size+=chunk.length;if(size>32768)throw Object.assign(Error('Request is too large.'),{status:413});chunks.push(chunk);}
   try{return JSON.parse(Buffer.concat(chunks).toString());}catch{throw Object.assign(Error('Send a valid JSON request.'),{status:400});}
 }
-export function createApp({apiKey=(process.env.ELEVENLABS_API_KEY||'').trim(),directory=process.env.FUSE_DATA_DIR||fileURLToPath(new URL('./data/generated/',import.meta.url)),fetchImpl=fetch}={}){
-  const generation=createGenerationService({directory,apiKey,fetchImpl});
+export function createApp({apiKey=(process.env.ELEVENLABS_API_KEY||'').trim(),directory=process.env.FUSE_DATA_DIR||fileURLToPath(new URL('./data/generated/',import.meta.url)),fetchImpl=fetch,provider=process.env.FUSE_GENERATION_PROVIDER||'elevenlabs',localBaseUrl=process.env.FUSE_LOCAL_ACE_URL||'http://127.0.0.1:8001'}={}){
+  if(provider==='ace-step')aceBase(localBaseUrl);
+  const generation=createGenerationService({directory,apiKey,fetchImpl,provider,localBaseUrl,timeoutMs:provider==='ace-step'?900000:300000});
   return http.createServer(async(req,res)=>{
     try{
       const url=new URL(req.url,'http://localhost');
-      if(url.pathname==='/api/status'&&req.method==='GET')return json(res,200,{connected:Boolean(apiKey)&&localRequest(req),provider:apiKey?'elevenlabs':null,verified:false,localOnly:true});
+      if(url.pathname==='/api/status'&&req.method==='GET'){
+        const connected=localRequest(req)&&(provider==='ace-step'?await aceReady({baseUrl:localBaseUrl,fetchImpl}):Boolean(apiKey));
+        return json(res,200,{connected,provider:provider==='ace-step'?'ace-step':apiKey?'elevenlabs':null,verified:false,localOnly:true});
+      }
       if(url.pathname.startsWith('/api/')){
         if(!localRequest(req))return json(res,403,{error:'Generation and generated files are available only on localhost. Imported-audio mixing still works over your LAN.'});
         if(req.headers.origin&&req.headers.origin!=='http://'+req.headers.host)return json(res,403,{error:'Open the app directly on localhost to use generation.'});
         if(url.pathname==='/api/generate'){
           if(req.method!=='POST')return json(res,405,{error:'Use POST to start generation.'});
-          if(!apiKey)return json(res,503,{error:'Audio generation is not connected. Add ELEVENLABS_API_KEY to your local .env file and restart.'});
+          if(provider==='elevenlabs'&&!apiKey)return json(res,503,{error:'Audio generation is not connected. Add ELEVENLABS_API_KEY to your local .env file and restart.'});
           return json(res,202,await generation.start(await body(req)));
         }
         const jobRoute=url.pathname.match(/^\/api\/jobs\/([0-9a-f-]{36})$/);
@@ -37,7 +42,8 @@ export function createApp({apiKey=(process.env.ELEVENLABS_API_KEY||'').trim(),di
         const audioRoute=url.pathname.match(/^\/api\/audio\/([0-9a-f-]{36})$/);
         if(audioRoute&&['GET','HEAD'].includes(req.method)){
           const audio=await generation.audio(audioRoute[1]);if(!audio)return json(res,404,{error:'Generated audio not found.'});
-          const headers={'Content-Type':'audio/mpeg','Cache-Control':'no-store','Accept-Ranges':'bytes','Content-Disposition':`${url.searchParams.has('download')?'attachment':'inline'}; filename="fuse-generated.mp3"`};
+          const format=(await generation.get(audioRoute[1])).format||'mp3';
+          const headers={'Content-Type':format==='wav'?'audio/wav':'audio/mpeg','Cache-Control':'no-store','Accept-Ranges':'bytes','Content-Disposition':`${url.searchParams.has('download')?'attachment':'inline'}; filename="fuse-generated.${format}"`};
           let start=0,end=audio.length-1,code=200;
           if(req.headers.range){
             const match=/^bytes=(\d*)-(\d*)$/.exec(req.headers.range);

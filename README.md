@@ -1,6 +1,6 @@
 # FUSE — Song Fusion Studio
 
-Local song-fusion studio with two-track DSP mixing, manual songwriting, and optional server-side ElevenLabs Music generation.
+Local song-fusion studio with two-track DSP mixing, manual songwriting, and local ACE-Step generation and optional server-side ElevenLabs Music generation.
 
 ## Run
 
@@ -28,6 +28,10 @@ Open http://127.0.0.1:3000. Set `PORT` to use another port. The server defaults 
 - Responsive layout and keyboard-accessible controls.
 
 Imported audio is never uploaded. Recipes are stored in this browser's localStorage, not an account. Clearing browser data removes recipes and the working draft. Clear or New fusion starts a fresh working draft. Audio files are session-only. The optional Google Fonts stylesheet falls back to system fonts when offline.
+
+## Free local music generation
+
+ACE-Step 1.5 has been installed and tested on this computer. A 10-second stereo instrumental completed in 21 seconds using low-memory GPU settings, without API credits. See [local installation and startup](docs/LOCAL-GENERATION.md). Start the model with `npm run local:engine`, then start FUSE in another terminal. Select `FUSE_GENERATION_PROVIDER=ace-step` in your private `.env`. Local mode supports instrumental clips up to 30 seconds and never falls back to a paid provider.
 
 ## ElevenLabs Music generation
 

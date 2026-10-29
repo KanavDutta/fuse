@@ -8,9 +8,9 @@ import {createApp} from '../server.mjs';
 import {createGenerationService,validateGeneration,providerFailure} from '../generation.mjs';
 import {generationPrompt} from '../public/generation-client.js';
 
-async function fixture(t,fetchImpl,apiKey='test-key-not-a-real-credential'){
+async function fixture(t,fetchImpl,apiKey='test-key-not-a-real-credential',options={}){
   const directory=await mkdtemp(path.join(os.tmpdir(),'fuse-generation-'));
-  const server=createApp({directory,fetchImpl,apiKey});
+  const server=createApp({directory,fetchImpl,apiKey,...options});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));
     if(!path.resolve(directory).startsWith(path.resolve(os.tmpdir())+path.sep))throw Error('Unexpected cleanup path');
@@ -109,4 +109,20 @@ test('server restart marks interrupted jobs failed instead of pretending to resu
   const id='11111111-1111-1111-1111-111111111111';await writeFile(path.join(directory,id+'.json'),JSON.stringify({id,status:'running'}));
   const service=createGenerationService({directory});await service.ready;
   assert.equal((await service.get(id)).status,'failed');assert.match((await service.get(id)).error,/restarted/);
+});
+
+test('local provider persists WAV and never sends the saved paid-provider key',async t=>{
+  const {base}=await fixture(t,async(url,options)=>{
+    assert.ok(String(url).startsWith('http://127.0.0.1:8001/'));
+    assert.equal(options?.headers?.['xi-api-key'],undefined);
+    if(String(url).endsWith('/health'))return Response.json({code:200,data:{models_initialized:true}});
+    if(String(url).endsWith('/release_task'))return Response.json({code:200,data:{task_id:'local-test'}});
+    if(String(url).endsWith('/query_result'))return Response.json({code:200,data:[{task_id:'local-test',status:1,result:'[{"file":"/v1/audio?path=test.wav"}]'}]});
+    return new Response('RIFF-local-test',{headers:{'Content-Type':'audio/wav'}});
+  },'test-key-not-a-real-credential',{provider:'ace-step'});
+  const status=await (await fetch(base+'/api/status')).json();assert.equal(status.provider,'ace-step');assert.equal(status.connected,true);
+  const job=await (await start(base)).json(),completed=await waitFor(base,job.id,'completed');
+  assert.equal(completed.provider,'ace-step');assert.equal(completed.format,'wav');
+  const audio=await fetch(base+completed.audioUrl+'?download=1');assert.equal(audio.headers.get('content-type'),'audio/wav');assert.match(audio.headers.get('content-disposition'),/\.wav/);
+  assert.equal(await audio.text(),'RIFF-local-test');
 });
